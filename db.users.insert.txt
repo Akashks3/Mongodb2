@@ -1,0 +1,153 @@
+﻿
+db.users.insertMany([
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f1"), "name": "Alice Smith", "email": "alice@example.com" },
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f2"), "name": "Bob Johnson", "email": "bob@example.com" }
+]);
+db.codekata.insertMany([
+  { "user_id": ObjectId("64d0d5b539c6f4e2ab51d7f1"), "problems_solved": 50 },
+  { "user_id": ObjectId("64d0d5b539c6f4e2ab51d7f2"), "problems_solved": 30 }
+]);
+db.attendance.insertMany([
+  { "user_id": ObjectId("64d0d5b539c6f4e2ab51d7f1"), "date": new Date("2024-10-16"), "status": "absent" },
+  { "user_id": ObjectId("64d0d5b539c6f4e2ab51d7f2"), "date": new Date("2024-10-17"), "status": "present" }
+]);
+db.topics.insertMany([
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f3"), "topic_name": "Introduction to MongoDB", "date": new Date("2024-10-01") },
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f4"), "topic_name": "Aggregation Framework", "date": new Date("2024-10-15") }
+]);
+db.tasks.insertMany([
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f5"), "task_name": "Basic Querying", "topic_id": ObjectId("64d0d5b539c6f4e2ab51d7f3"), "submission_date": new Date("2024-10-05") },
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f6"), "task_name": "Aggregation Pipeline", "topic_id": ObjectId("64d0d5b539c6f4e2ab51d7f4") }
+]);
+db.company_drives.insertMany([
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f7"), "company_name": "TechCorp", "drive_date": new Date("2020-10-16") },
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f8"), "company_name": "Innovate Ltd.", "drive_date": new Date("2020-10-30") }
+]);
+db.mentors.insertMany([
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7f9"), "name": "Dr. Jane Doe", "mentees_count": 20 },
+  { "_id": ObjectId("64d0d5b539c6f4e2ab51d7fa"), "name": "Mr. John Smith", "mentees_count": 10 }
+]);
+db.appearances.insertMany([
+  { "drive_id": ObjectId("64d0d5b539c6f4e2ab51d7f7"), "user_id": ObjectId("64d0d5b539c6f4e2ab51d7f1") },
+  { "drive_id": ObjectId("64d0d5b539c6f4e2ab51d7f8"), "user_id": ObjectId("64d0d5b539c6f4e2ab51d7f2") }
+]);
+db.topics.aggregate([
+  {
+    $match: {
+      $expr: {
+        $eq: [{ $month: "$date" }, 10]
+      }
+    }
+  },
+  {
+    $lookup: {
+      from: "tasks",
+      localField: "_id",
+      foreignField: "topic_id",
+      as: "tasks"
+    }
+  },
+  {
+    $project: {
+      topic_name: 1,
+      tasks: { task_name: 1 }
+    }
+  }
+]).pretty();
+
+db.company_drives.find({
+  drive_date: {
+    $gte: new Date("2020-10-15T00:00:00Z"),
+    $lte: new Date("2020-10-31T23:59:59Z")
+  }
+}).pretty();
+
+db.appearances.aggregate([
+  {
+    $lookup: {
+      from: "company_drives",
+      localField: "drive_id",
+      foreignField: "_id",
+      as: "company_drive"
+    }
+  },
+  {
+    $lookup: {
+      from: "users",
+      localField: "user_id",
+      foreignField: "_id",
+      as: "student"
+    }
+  },
+  {
+    $unwind: "$company_drive"
+  },
+  {
+    $unwind: "$student"
+  },
+  {
+    $project: {
+      company_name: "$company_drive.company_name",
+      student_name: "$student.name"
+    }
+  }
+]);
+
+db.codekata.aggregate([
+  {
+    $lookup: {
+      from: "users",
+      localField: "user_id",
+      foreignField: "_id",
+      as: "user"
+    }
+  },
+  {
+    $unwind: "$user"
+  },
+  {
+    $project: {
+      name: "$user.name",
+      problems_solved: 1
+    }
+  }
+]);
+
+db.mentors.find({
+  mentees_count: { $gt: 15 }
+});
+
+db.attendance.aggregate([
+  {
+    $match: {
+      status: "absent",
+      date: {
+        $gte: new Date("2020-10-15T00:00:00Z"),
+        $lte: new Date("2020-10-31T23:59:59Z")
+      }
+    }
+  },
+  {
+    $lookup: {
+      from: "tasks",
+      localField: "user_id",
+      foreignField: "user_id",
+      as: "tasks"
+    }
+  },
+  {
+    $match: {
+      "tasks.submission_date": { $exists: false }
+    }
+  },
+  {
+    $group: {
+      _id: "$user_id",
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $count: "absent_and_not_submitted_count"
+  }
+]);
+
